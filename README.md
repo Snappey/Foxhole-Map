@@ -1,59 +1,18 @@
-# FoxholeMap
+# Interactive Foxhole Map
+[![Angular](https://img.shields.io/badge/Angular-19-red.svg)](https://angular.io/)
+[![OpenLayers](https://img.shields.io/badge/OpenLayers-10.3-blue.svg)](https://openlayers.org/)
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.0.4.
+A simple interactive map for [Foxhole](https://www.foxholegame.com/) using OpenLayers and the Official Foxhole API for live data.
 
-## Development server
+Deployed [here](https://foxhole-map-pcayj.ondigitalocean.app/) for now.
 
-To start a local development server, run:
+## Features
 
-```bash
-ng serve
-```
+- Whole map can be viewed with (hopefully) minimal performance issues
+- Select any Shard (Able, Baker or Charlie)
+- See all in-game structures including bases, resource fields, factories, and more
+- Automatically refreshes showing changes as they happen
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+## What does it look like?
 
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
-
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+![Foxhole Map](./assets/example.png)
