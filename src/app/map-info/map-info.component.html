@@ -1,0 +1,15 @@
+<div class="flex flex-col px-1 mx-2 bg-zinc-900 rounded-sm">
+  <div class="flex w-full h-fit mt-2 mx-0">
+    <p-select class="mx-1 w-full" size="small" [options]="selectableShards" [(ngModel)]="shard" (onChange)="saveSelectedShard($event)"/>
+  </div>
+  @if (isActiveWar()) {
+    <p class="text-sm mt-2 mb-2">
+      War #{{warData()?.warNumber}}
+      @if (warData()?.conquestStartTime !== undefined) {
+        started {{getTimeSince(warData()!.conquestStartTime)}} ago
+      }
+    </p>
+  } @else {
+    <p>No active war</p>
+  }
+</div>

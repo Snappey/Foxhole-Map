@@ -1,1 +1,27 @@
 /* You can add global styles to this file, and also import other style files */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;npm i tailwindcss-primeui
+
+html,
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  height: 100%;
+  background-color: #000;
+}
+
+/* Base panel */
+.layer-switcher {
+  color: black; /* Change this to your desired color */
+}
+
+/* Layer titles */
+.layer-switcher .panel ul li label {
+  color: black; /* Change this to your desired color */
+}
+
+/* Group titles */
+.layer-switcher .group-select-style {
+  color: black; /* Change this to your desired color */
+}

@@ -18,7 +18,15 @@
     "@angular/platform-browser": "^19.0.0",
     "@angular/platform-browser-dynamic": "^19.0.0",
     "@angular/router": "^19.0.0",
+    "@primeng/themes": "^19.0.5",
+    "@turf/turf": "^7.2.0",
+    "@types/proj4": "^2.5.5",
+    "ol": "^10.3.1",
+    "ol-layerswitcher": "^4.1.2",
+    "primeng": "^19.0.5",
+    "proj4": "^2.15.0",
     "rxjs": "~7.8.0",
+    "tailwindcss-primeui": "^0.4.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.15.0"
   },
@@ -27,12 +35,15 @@
     "@angular/cli": "^19.0.4",
     "@angular/compiler-cli": "^19.0.0",
     "@types/jasmine": "~5.1.0",
+    "autoprefixer": "^10.4.20",
     "jasmine-core": "~5.4.0",
     "karma": "~6.4.0",
     "karma-chrome-launcher": "~3.2.0",
     "karma-coverage": "~2.2.0",
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
+    "postcss": "^8.5.1",
+    "tailwindcss": "^3.4.17",
     "typescript": "~5.6.2"
   }
 }
