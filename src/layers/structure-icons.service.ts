@@ -7,7 +7,7 @@ import {
   HexName,
   MapStructure,
   Shard,
-  TeamId,
+  TeamId, VictoryPointStructure,
   WarApiService
 } from '../services/war-api.service';
 import {Point} from 'ol/geom';
@@ -113,15 +113,28 @@ export class StructureIconsService implements LayerService {
           data.mapItems.forEach(mapItem => {
             const [x, y] = this.hexCoordinateService.normaliseCoordinates(name as HexName, [mapItem.x, mapItem.y]);
 
+            const isScorched = (mapItem.flags & 0x10) == 0x10
+            const isVictoryPoint = (mapItem.flags & 0x01) == 0x01
+
+            let labelName = getMapStructureFriendlyName(mapItem.iconType);
+
+            if (isVictoryPoint) {
+              labelName = `Victory Point`;
+            }
+
+            if (isScorched) {
+              labelName = `Scorched ${labelName}`;
+            }
+
             const label = new Feature({
               geometry: new Point([x, y]),
-              name: getMapStructureFriendlyName(mapItem.iconType)
+              name: labelName,
             });
             label.setStyle(new Style({
               image: new Icon({
-                src: getMapIcon(mapItem.iconType),
+                src: isVictoryPoint ? VictoryPointStructure :getMapIcon(mapItem.iconType),
                 scale: 0.5,
-                color: this.getTeamColour(mapItem.teamId)
+                color: isScorched ? "#e74c3c" : this.getTeamColour(mapItem.teamId)
               }),
               zIndex: 9999
             }));

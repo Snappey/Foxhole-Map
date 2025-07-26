@@ -216,8 +216,9 @@ export const MapIcons: Record<MapStructure, string> = {
   [MapStructure.FacilityMineOilRig]: './assets/MapIconFacilityMineOilRig.webp',
   [MapStructure.SpecialBaseKeep]: './assets/MapIconsKeep.webp',
   [MapStructure.GarrisonStation]: './assets/MapIconBorderBase.webp',
-
 }
+
+export const VictoryPointStructure = "./assets/MapIconTownHallNeutral.webp"
 
 export const getMapIcon = (iconType: MapStructure): string => {
   const mapIcon = MapIcons[iconType];
