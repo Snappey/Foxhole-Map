@@ -5,6 +5,7 @@ import {SettingsService} from '../../services/settings.service';
 import {FormsModule} from '@angular/forms';
 import {toObservable, toSignal} from '@angular/core/rxjs-interop';
 import {switchMap} from 'rxjs';
+import {JsonPipe} from '@angular/common';
 
 @Component({
   selector: 'app-map-info',
@@ -19,7 +20,10 @@ export class MapInfoComponent {
   private readonly settingsService = inject(SettingsService);
   private readonly warApiService = inject(WarApiService);
 
-  public selectableShards: string[] = [WarApiService.ABLE_SHARD, WarApiService.BAKER_SHARD, WarApiService.CHARLIE_SHARD];
+  public selectableShards: { label: string; value: string }[] = [
+    { label: "Able", value: WarApiService.ABLE_SHARD},
+    { label: "Charlie", value: WarApiService.CHARLIE_SHARD}
+  ];
 
   shard: Signal<Shard> = this.settingsService.selectedShard;
   warData = toSignal(
