@@ -116,7 +116,9 @@ export class MapComponent implements AfterViewInit {
     projection: this.gameProjection
   });
 
-  readonly mapLink = new Link();
+  readonly mapLink = new Link({
+    params: ["x", "y", "z", "l"]
+  });
   readonly mapLinkUpdater = effect(() => {
     this.mapLink.update("shard", this.shard())
   })
