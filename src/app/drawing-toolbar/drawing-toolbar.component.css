@@ -1,0 +1,19 @@
+
+/* Responsive positioning adjustments */
+@media (max-height: 600px) {
+  :host {
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  :host ::ng-deep .absolute.right-full {
+    position: absolute;
+    top: auto;
+    bottom: 100%;
+    right: 0;
+    margin-right: 0;
+    margin-bottom: 0.5rem;
+  }
+}

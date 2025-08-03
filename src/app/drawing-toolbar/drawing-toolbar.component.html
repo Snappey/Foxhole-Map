@@ -1,0 +1,134 @@
+<div class="relative">
+  <div class="w-12 bg-slate-800 backdrop-blur-lg rounded-full shadow-xl border border-slate-600 h-fit z-[1000] transition-all duration-200 hover:shadow-2xl hover:border-blue-500/30">
+    <div class="w-11 py-1 flex flex-col items-center justify-center gap-1">
+    <button
+      *ngFor="let tool of drawingTools"
+      pButton
+      class="p-button-sm flex items-center justify-center w-8 h-8 p-0 !rounded-full transition-all duration-200 ease-in-out overflow-hidden flex-shrink-0 hover:-translate-x-0.5 hover:scale-105 active:translate-x-0 active:scale-95"
+      [class.p-button-outlined]="!isActive(tool.type)"
+      [class.p-button-success]="isActive(tool.type)"
+      (click)="setDrawingType(tool.type)"
+      [pTooltip]="tool.tooltip"
+      tooltipPosition="left">
+      <i [class]="tool.icon" class="text-sm"></i>
+    </button>
+
+    <div class="h-px w-6 bg-slate-600 my-0.5"></div>
+
+    <p-colorPicker
+      [(ngModel)]="selectedColor"
+      (ngModelChange)="onColorChange($event)"
+      [inline]="false"
+      [appendTo]="'body'"
+      format="hex"
+      styleClass="mt-2"
+      class="rounded transition-all duration-200 focus:outline-blue-400 focus:outline-offset-2"
+      pTooltip="Drawing Colour"
+      tooltipPosition="left">
+    </p-colorPicker>
+
+    <div class="h-px w-6 bg-slate-600 my-0.5"></div>
+
+    <button pButton
+      class="p-button-sm p-button-text text-blue-400 hover:bg-blue-400 !w-8 !h-8 flex items-center justify-center !rounded-full transition-all duration-200 ease-in-out flex-shrink-0 hover:-translate-x-px hover:scale-105 focus-visible:outline-2 focus-visible:outline-blue-400 focus-visible:outline-offset-2"
+      (click)="importDrawings()"
+      pTooltip="Import"
+      tooltipPosition="left">
+      <i class="pi pi-upload text-xs"></i>
+    </button>
+
+    <button pButton
+      class="p-button-sm p-button-text text-green-400 hover:bg-green-400 !w-8 !h-8 flex items-center justify-center !rounded-full transition-all duration-200 ease-in-out flex-shrink-0 hover:-translate-x-px hover:scale-105 focus-visible:outline-2 focus-visible:outline-blue-400 focus-visible:outline-offset-2"
+      (click)="exportDrawings()"
+      pTooltip="Export"
+      tooltipPosition="left">
+      <i class="pi pi-download text-xs"></i>
+    </button>
+
+    <button pButton
+      class="p-button-sm p-button-text text-red-400 hover:bg-red-400 !w-8 !h-8 flex items-center justify-center !rounded-full transition-all duration-200 ease-in-out flex-shrink-0 hover:-translate-x-px hover:scale-105 focus-visible:outline-2 focus-visible:outline-blue-400 focus-visible:outline-offset-2"
+      (click)="clearAllDrawings()"
+      pTooltip="Clear all drawings"
+      tooltipPosition="left">
+      <i class="pi pi-trash text-xs"></i>
+    </button>
+    </div>
+  </div>
+
+  @if (activeDrawingType()) {
+    <div class="absolute left-[-280px] top-0 bg-slate-900/90 backdrop-blur-lg rounded-lg shadow-xl border border-slate-600/50 w-fit z-[1000] transition-all duration-200">
+    <div class="px-3 py-2">
+      <div class="flex flex-col gap-2">
+
+        <div class="flex items-center gap-2">
+          <label class="text-xs text-slate-300 w-12">Label:</label>
+          <input
+            pInputText
+            size="small"
+            [(ngModel)]="shapeText"
+            (ngModelChange)="onTextChange($event)"
+            placeholder="Tooltip text"
+            class="w-48 text-xs">
+        </div>
+
+        <div class="flex items-center gap-2">
+          <label class="text-xs text-slate-300 w-12">Image:</label>
+          <input
+            pInputText
+            size="small"
+            [(ngModel)]="imageUrl"
+            (ngModelChange)="onImageUrlChange($event)"
+            placeholder="Image URL"
+            class="w-48 text-xs">
+        </div>
+
+        @if (activeDrawingType() === 'Point') {
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-300 w-12">Icon:</label>
+            <p-dropdown
+              [options]="pointIcons"
+              [(ngModel)]="selectedIcon"
+              (ngModelChange)="onIconChange($event)"
+              optionLabel="name"
+              optionValue="value"
+              placeholder="Select icon"
+              size="small"
+              class="w-48">
+
+              <ng-template pTemplate="selectedItem" let-selectedOption>
+                <div class="flex items-center gap-2">
+                  @if (selectedOption?.value) {
+                    <img [ngSrc]="selectedOption.value" class="w-4 h-4 object-contain" [alt]="selectedOption.name" width="32" height="32">
+                  } @else {
+                    <div class="w-4 h-4 rounded-full bg-slate-400"></div>
+                  }
+                  <span class="text-xs">{{selectedOption?.name}}</span>
+                </div>
+              </ng-template>
+
+              <ng-template pTemplate="item" let-icon>
+                <div class="flex items-center gap-2 py-1">
+                  @if (icon.value) {
+                    <img [ngSrc]="icon.value" class="w-4 h-4 object-contain" [alt]="icon.name" width="32" height="32">
+                  } @else {
+                    <div class="w-4 h-4 rounded-full bg-slate-400"></div>
+                  }
+                  <div class="flex flex-col">
+                    <span class="text-sm">{{icon.name}}</span>
+                    @if (icon.category) {
+                      <span class="text-xs text-slate-400">{{icon.category}}</span>
+                    }
+                  </div>
+                </div>
+              </ng-template>
+            </p-dropdown>
+          </div>
+        }
+
+      </div>
+    </div>
+    </div>
+  }
+</div>
+
+<app-import-dialog></app-import-dialog>
