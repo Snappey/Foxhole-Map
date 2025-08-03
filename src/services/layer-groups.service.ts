@@ -86,7 +86,6 @@ export class LayerGroupsService {
     const currentStates = new Map(this.layerGroupStates());
     const currentState = currentStates.get(groupId);
 
-    console.log('Toggle layer group:', groupId, currentStates);
     if (currentState) {
       const newVisible = !currentState.visible;
 
