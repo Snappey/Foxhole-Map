@@ -290,6 +290,13 @@ export const hexFriendlyNames: Record<HexName, string> = {
   "TempestIslandHex": "Tempest Island"
 };
 
+export type WarVictoryPointSummary = {
+  warden: number;
+  colonial: number;
+  scorched: number;
+  required: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -367,6 +374,52 @@ export class WarApiService {
         ))
       )),
       map(mapData => Object.fromEntries(mapData.map(data => [data.mapName, data])))
+    );
+  }
+
+  getVictoryPointCounts(shard: Shard | undefined = undefined): Observable<WarVictoryPointSummary | undefined> {
+    return forkJoin([
+      this.getCurrentWarData(shard),
+      this.getAllMapDynamicData(shard)
+    ]).pipe(
+      map(([warData, mapData]): WarVictoryPointSummary | undefined => {
+        if (!warData) return undefined;
+
+        const isScorched = (mapItem: { flags: number }) => (mapItem.flags & 0x10) == 0x10;
+        const isVictoryPoint = (mapItem: { flags:number }) => (mapItem.flags & 0x01) == 0x01;
+
+        const summary = Object.values(mapData)
+          .reduce((warSummary, map): WarVictoryPointSummary =>
+            map.mapItems
+              .reduce((summary, item): WarVictoryPointSummary => {
+                const victoryPoint = isVictoryPoint(item);
+                const scorched = isScorched(item);
+
+                if (!victoryPoint) {
+                  return summary;
+                }
+
+                if (scorched) {
+                  summary.scorched++;
+                } else if (item.teamId === "WARDENS") {
+                  summary.warden++;
+                } else if (item.teamId === "COLONIALS") {
+                  summary.colonial++;
+                }
+
+                return summary;
+              }, warSummary),
+            {
+              warden: 0,
+              colonial: 0,
+              scorched: 0,
+              required: 0,
+            });
+
+        summary.required = warData.requiredVictoryTowns - summary.scorched;
+
+        return summary;
+      }),
     );
   }
 }
