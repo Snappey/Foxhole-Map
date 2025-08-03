@@ -1,4 +1,4 @@
-import {inject, Injectable} from '@angular/core';
+import {inject, Injectable, effect} from '@angular/core';
 import {firstValueFrom, map, Observable} from 'rxjs';
 import Feature from 'ol/Feature';
 import {
@@ -17,6 +17,7 @@ import VectorSource from 'ol/source/Vector';
 import VectorLayer from 'ol/layer/Vector';
 import LayerGroup from 'ol/layer/Group';
 import {LayerService} from './index';
+import {LayerGroupsService} from '../services/layer-groups.service';
 
 @Injectable({
   providedIn: 'root'
@@ -26,8 +27,18 @@ export class StructureIconsService implements LayerService {
   public name = 'Structure Icons';
   private readonly warApiService = inject(WarApiService);
   private readonly hexCoordinateService = inject(HexCoordinateService);
+  private readonly layerGroupsService = inject(LayerGroupsService);
+  private currentLayerGroup: LayerGroup | null = null;
+  private allFeatures: Map<string, Feature[]> = new Map();
 
-  constructor() { }
+  constructor() {
+    effect(() => {
+      const states = this.layerGroupsService.getLayerGroupStates();
+      if (this.currentLayerGroup) {
+        this.updateLayerVisibility();
+      }
+    });
+  }
 
   public async getLayer(shard: Shard): Promise<LayerGroup> {
     const mapData = await firstValueFrom(this.dynamicMapData(shard));
@@ -43,17 +54,51 @@ export class StructureIconsService implements LayerService {
         return layer;
       });
 
-    return new LayerGroup({
+    this.currentLayerGroup = new LayerGroup({
       layers: layers
     });
+
+    this.updateLayerVisibility();
+
+    return this.currentLayerGroup;
+  }
+
+  public updateLayerVisibility(): void {
+    if (!this.currentLayerGroup || this.allFeatures.size === 0) return;
+
+    const visibleStructures = this.layerGroupsService.getVisibleStructures();
+    const layers = this.currentLayerGroup.getLayers().getArray() as VectorLayer[];
+
+    layers.forEach(layer => {
+      const layerTitle = layer.get('title') as string;
+      const allLayerFeatures = this.allFeatures.get(layerTitle) || [];
+      const source = layer.getSource() as VectorSource;
+
+      const visibleFeatures = allLayerFeatures.filter(feature => {
+        const structureType = feature.get('structureType') as MapStructure;
+        return structureType ? visibleStructures.has(structureType) : true;
+      });
+
+      source.clear();
+      source.addFeatures(visibleFeatures);
+    });
+  }
+
+  public refreshLayer(shard: Shard): void {
+    if (this.currentLayerGroup) {
+      this.getLayer(shard).then(newLayerGroup => {
+        this.currentLayerGroup = newLayerGroup;
+        this.updateLayerVisibility();
+      });
+    }
   }
 
   private getTeamColour(teamId: TeamId): string {
     switch (teamId) {
       case "COLONIALS":
-        return "#516C4BFF";
+        return "#4d7e30";
       case "WARDENS":
-        return "#245682FF";
+        return "#2878bf";
       default:
         return "#ddd";
     }
@@ -109,13 +154,14 @@ export class StructureIconsService implements LayerService {
     return this.warApiService.getAllMapDynamicData(shard).pipe(
       map(mapData => {
         const layers: Record<string, Feature[]> = {};
+        this.allFeatures.clear(); // Clear previous features
+
         for (const [name, data] of Object.entries(mapData)) {
           data.mapItems.forEach(mapItem => {
             const [x, y] = this.hexCoordinateService.normaliseCoordinates(name as HexName, [mapItem.x, mapItem.y]);
 
             const isScorched = (mapItem.flags & 0x10) == 0x10
             const isVictoryPoint = (mapItem.flags & 0x01) == 0x01
-
             let labelName = getMapStructureFriendlyName(mapItem.iconType);
 
             if (isVictoryPoint) {
@@ -129,10 +175,15 @@ export class StructureIconsService implements LayerService {
             const label = new Feature({
               geometry: new Point([x, y]),
               name: labelName,
+              structureType: mapItem.iconType,
+              teamId: mapItem.teamId,
+              isVictoryPoint: isVictoryPoint,
+              isScorched: isScorched,
+              flags: mapItem.flags
             });
             label.setStyle(new Style({
               image: new Icon({
-                src: isVictoryPoint ? VictoryPointStructure :getMapIcon(mapItem.iconType),
+                src: isVictoryPoint ? VictoryPointStructure : getMapIcon(mapItem.iconType),
                 scale: 0.5,
                 color: isScorched ? "#e74c3c" : this.getTeamColour(mapItem.teamId)
               }),
@@ -143,9 +194,11 @@ export class StructureIconsService implements LayerService {
             const hasLayer = typeGroup in layers;
             if (!hasLayer) {
               layers[typeGroup] = [];
+              this.allFeatures.set(typeGroup, []);
             }
 
             layers[typeGroup].push(label);
+            this.allFeatures.get(typeGroup)!.push(label);
           });
         }
 
