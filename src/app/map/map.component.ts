@@ -226,7 +226,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   );
 
   readonly mapLink = new Link({
-    params: ["x", "y", "z", "l"]
+    params: ["x", "y", "z"]
   });
   readonly mapLinkUpdater = effect(() => {
     this.mapLink.update("shard", this.shard())
