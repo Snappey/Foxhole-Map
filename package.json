@@ -23,6 +23,7 @@
     "@types/proj4": "^2.5.5",
     "ol": "^10.3.1",
     "ol-layerswitcher": "^4.1.2",
+    "primeicons": "^7.0.0",
     "primeng": "^19.0.5",
     "proj4": "^2.15.0",
     "rxjs": "~7.8.0",
