@@ -2,7 +2,7 @@
 
 import { Injectable } from '@angular/core';
 import {HttpClient} from '@angular/common/http';
-import {catchError, forkJoin, map, Observable, of, switchMap, tap} from 'rxjs';
+import {catchError, forkJoin, map, Observable, of, switchMap, tap, share, throwError} from 'rxjs';
 
 export type TeamId = "NONE" | "WARDENS" | "COLONIALS";
 export type Shard = "able" | "baker" | "charlie";
@@ -297,6 +297,22 @@ export type WarVictoryPointSummary = {
   required: number;
 }
 
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+  expiry?: number; // undefined means never expires (lifetime cache)
+}
+
+interface CacheConfig {
+  dynamicDataCacheDuration: number; // milliseconds
+  warDataCacheDuration: number; // milliseconds
+}
+
+const DEFAULT_CACHE_CONFIG: CacheConfig = {
+  dynamicDataCacheDuration: 30000, // 30 seconds
+  warDataCacheDuration: 60000, // 1 minute
+};
+
 @Injectable({
   providedIn: 'root'
 })
@@ -313,7 +329,86 @@ export class WarApiService {
     [WarApiService.CHARLIE_SHARD]: "https://war-service-live-3.foxholeservices.com/api",
   }
 
+  private cacheConfig: CacheConfig = DEFAULT_CACHE_CONFIG;
+  private cache = new Map<string, CacheEntry<any>>();
+  private activeRequests = new Map<string, Observable<any>>();
+
   constructor(private http: HttpClient) { }
+
+  setCacheConfig(config: Partial<CacheConfig>): void {
+    this.cacheConfig = { ...this.cacheConfig, ...config };
+  }
+
+  clearCache(): void {
+    this.cache.clear();
+    this.activeRequests.clear();
+  }
+
+  clearCacheForShard(shard: Shard): void {
+    const keysToDelete = Array.from(this.cache.keys()).filter(key => key.includes(shard));
+    keysToDelete.forEach(key => this.cache.delete(key));
+  }
+
+  private generateCacheKey(type: string, shard: string, ...params: string[]): string {
+    return `${type}-${shard}-${params.join('-')}`;
+  }
+
+  private getCachedData<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+
+    const now = Date.now();
+
+    // Check if entry has expired (undefined expiry means never expires)
+    if (entry.expiry !== undefined && now > entry.expiry) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    return entry.data;
+  }
+
+  private setCachedData<T>(key: string, data: T, cacheDuration?: number): void {
+    const now = Date.now();
+    const entry: CacheEntry<T> = {
+      data,
+      timestamp: now,
+      expiry: cacheDuration ? now + cacheDuration : undefined
+    };
+    this.cache.set(key, entry);
+  }
+
+  private getOrFetch<T>(
+    key: string,
+    fetchFn: () => Observable<T>,
+    cacheDuration?: number
+  ): Observable<T> {
+    const cached = this.getCachedData<T>(key);
+    if (cached !== null) {
+      return of(cached);
+    }
+
+    const activeRequest = this.activeRequests.get(key) as Observable<T>;
+    if (activeRequest) {
+      return activeRequest;
+    }
+
+    // Make new request
+    const request = fetchFn().pipe(
+      tap(data => {
+        this.setCachedData(key, data, cacheDuration);
+        this.activeRequests.delete(key);
+      }),
+      catchError(error => {
+        this.activeRequests.delete(key);
+        return throwError(() => error);
+      }),
+      share()
+    );
+
+    this.activeRequests.set(key, request);
+    return request;
+  }
 
   private getShardUrl(shard: Shard | undefined) {
     if (!shard) {
@@ -324,32 +419,66 @@ export class WarApiService {
   }
 
   getCurrentWarData(shard: Shard | undefined = undefined): Observable<WarData | undefined> {
-    const shardUrl = this.getShardUrl(shard);
-    const url = `${shardUrl}/worldconquest/war`;
-    return this.http.get<WarData>(url).pipe(
-      catchError(_ => of(undefined))
+    const shardKey = shard || 'able';
+    const cacheKey = this.generateCacheKey('war-data', shardKey);
+
+    return this.getOrFetch(
+      cacheKey,
+      () => {
+        const shardUrl = this.getShardUrl(shard);
+        const url = `${shardUrl}/worldconquest/war`;
+        return this.http.get<WarData>(url).pipe(
+          catchError(_ => of(undefined))
+        );
+      },
+      this.cacheConfig.warDataCacheDuration
     );
   }
 
   getMapNames(shard: Shard | undefined = undefined): Observable<string[]> {
-    const shardUrl = this.getShardUrl(shard);
-    const url = `${shardUrl}/worldconquest/maps`;
-    return this.http.get<string[]>(url);
+    const shardKey = shard || 'able';
+    const cacheKey = this.generateCacheKey('map-names', shardKey);
+
+    return this.getOrFetch(
+      cacheKey,
+      () => {
+        const shardUrl = this.getShardUrl(shard);
+        const url = `${shardUrl}/worldconquest/maps`;
+        return this.http.get<string[]>(url);
+      }
+    );
   }
 
   getMapReport(shard: Shard | undefined = undefined, mapName: string): Observable<WarMapReport> {
-    const shardUrl = this.getShardUrl(shard);
-    const url = `${shardUrl}/worldconquest/warreport/${mapName}`;
-    return this.http.get<WarMapReport>(url).pipe(
-      map(report => ({...report, mapName}))
+    const shardKey = shard || 'able';
+    const cacheKey = this.generateCacheKey('map-report', shardKey, mapName);
+
+    return this.getOrFetch(
+      cacheKey,
+      () => {
+        const shardUrl = this.getShardUrl(shard);
+        const url = `${shardUrl}/worldconquest/warreport/${mapName}`;
+        return this.http.get<WarMapReport>(url).pipe(
+          map(report => ({...report, mapName}))
+        );
+      },
+      this.cacheConfig.dynamicDataCacheDuration
     );
   }
 
   getMapStaticData(shard: Shard | undefined = undefined, mapName: string): Observable<WarMapData> {
-    const shardUrl = this.getShardUrl(shard);
-    const url = `${shardUrl}/worldconquest/maps/${mapName}/static`;
-    return this.http.get<WarMapData>(url).pipe(
-      map(data => ({...data, mapName}))
+    const shardKey = shard || 'able';
+    const cacheKey = this.generateCacheKey('map-static', shardKey, mapName);
+
+    return this.getOrFetch(
+      cacheKey,
+      () => {
+        const shardUrl = this.getShardUrl(shard);
+        const url = `${shardUrl}/worldconquest/maps/${mapName}/static`;
+        return this.http.get<WarMapData>(url).pipe(
+          map(data => ({...data, mapName}))
+        );
+      }
     );
   }
 
@@ -361,9 +490,18 @@ export class WarApiService {
   }
 
   getMapDynamicData(shard: Shard | undefined = undefined, mapName: string): Observable<WarMapData> {
-    const shardUrl = this.getShardUrl(shard);
-    const url = `${shardUrl}/worldconquest/maps/${mapName}/dynamic/public`;
-    return this.http.get<WarMapData>(url);
+    const shardKey = shard || 'able';
+    const cacheKey = this.generateCacheKey('map-dynamic', shardKey, mapName);
+
+    return this.getOrFetch(
+      cacheKey,
+      () => {
+        const shardUrl = this.getShardUrl(shard);
+        const url = `${shardUrl}/worldconquest/maps/${mapName}/dynamic/public`;
+        return this.http.get<WarMapData>(url);
+      },
+      this.cacheConfig.dynamicDataCacheDuration
+    );
   }
 
   getAllMapDynamicData(shard: Shard | undefined = undefined): Observable<Record<string, WarMapData>> {
@@ -421,5 +559,47 @@ export class WarApiService {
         return summary;
       }),
     );
+  }
+
+  // Cache management
+  getCacheStats(): { totalEntries: number; memoryUsage: string; expiredEntries: number } {
+    const now = Date.now();
+    let expiredCount = 0;
+    let totalSize = 0;
+
+    for (const [key, entry] of this.cache) {
+      if (entry.expiry !== undefined && now > entry.expiry) {
+        expiredCount++;
+      }
+      totalSize += JSON.stringify(entry).length;
+    }
+
+    return {
+      totalEntries: this.cache.size,
+      memoryUsage: `${(totalSize / 1024).toFixed(2)} KB`,
+      expiredEntries: expiredCount
+    };
+  }
+
+  cleanupExpiredEntries(): number {
+    const now = Date.now();
+    let cleanedCount = 0;
+
+    for (const [key, entry] of this.cache) {
+      if (entry.expiry !== undefined && now > entry.expiry) {
+        this.cache.delete(key);
+        cleanedCount++;
+      }
+    }
+
+    return cleanedCount;
+  }
+
+  refreshDynamicData(shard?: Shard): void {
+    const shardKey = shard || 'able';
+    const keysToDelete = Array.from(this.cache.keys()).filter(key =>
+      key.includes('map-dynamic') && key.includes(shardKey)
+    );
+    keysToDelete.forEach(key => this.cache.delete(key));
   }
 }
