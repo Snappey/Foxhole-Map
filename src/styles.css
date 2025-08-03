@@ -1,7 +1,7 @@
 /* You can add global styles to this file, and also import other style files */
 @tailwind base;
 @tailwind components;
-@tailwind utilities;npm i tailwindcss-primeui
+@tailwind utilities;
 
 html,
 body {
@@ -11,17 +11,50 @@ body {
   background-color: #000;
 }
 
-/* Base panel */
-.layer-switcher {
-  color: black; /* Change this to your desired color */
+.p-colorpicker-panel {
+  position: absolute !important;
+  z-index: 10000 !important;
 }
 
-/* Layer titles */
-.layer-switcher .panel ul li label {
-  color: black; /* Change this to your desired color */
+.p-colorpicker-content {
+  padding: 8px;
 }
 
-/* Group titles */
-.layer-switcher .group-select-style {
-  color: black; /* Change this to your desired color */
+.p-colorpicker-color-selector {
+  width: 200px;
+  height: 150px;
+  position: relative;
+  background: linear-gradient(to right, #fff 0%, rgba(255,255,255,0) 100%), linear-gradient(to top, #000 0%, rgba(0,0,0,0) 100%);
+}
+
+.p-colorpicker-color-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.p-colorpicker-hue {
+  width: 20px;
+  height: 150px;
+  margin-left: 8px;
+  position: relative;
+  background: linear-gradient(to bottom, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);
+}
+
+.p-colorpicker-hue-handle {
+  position: absolute;
+  left: -2px;
+  width: 24px;
+  height: 8px;
+  cursor: pointer;
+}
+
+.p-colorpicker-preview {
+  width: 32px;
+  height: 24px;
+  margin-bottom: 8px;
 }

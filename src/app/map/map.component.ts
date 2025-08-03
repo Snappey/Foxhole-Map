@@ -1,4 +1,4 @@
-import {AfterViewInit, Component, effect, ElementRef, inject, Signal, ViewChild, WritableSignal} from '@angular/core';
+import {AfterViewInit, Component, effect, ElementRef, inject, OnDestroy, ViewChild, WritableSignal} from '@angular/core';
 import {MapInfoComponent} from '../map-info/map-info.component';
 import Map from 'ol/Map';
 import {SettingsService} from '../../services/settings.service';
@@ -16,80 +16,194 @@ import {Projection} from 'ol/proj';
 import TileLayer from 'ol/layer/Tile';
 import TileDebug from 'ol/source/TileDebug';
 import {TileGrid} from 'ol/tilegrid';
-import {MousePosition} from 'ol/control';
-import {createStringXY} from 'ol/coordinate';
 import LayerSwitcher from 'ol-layerswitcher';
-import {DragPan, Draw, Link, MouseWheelZoom} from 'ol/interaction';
+import {DragPan, Link, MouseWheelZoom} from 'ol/interaction';
 import {Kinetic} from 'ol';
-import VectorSource from 'ol/source/Vector';
-import {Stroke, Style} from 'ol/style';
-import {shiftKeyOnly} from 'ol/events/condition';
 import View from 'ol/View';
 import XYZ from 'ol/source/XYZ';
 import LayerGroup from 'ol/layer/Group';
 import VectorLayer from 'ol/layer/Vector';
+import {DrawingToolbarComponent} from '../drawing-toolbar/drawing-toolbar.component';
+import {DrawingService, DrawingType} from '../../services/drawing.service';
+import {DrawingContextMenuComponent} from '../drawing-context-menu/drawing-context-menu.component';
+import {LayerGroupsToolbarComponent} from '../layer-groups-toolbar/layer-groups-toolbar.component';
+import {LayerGroupsService} from '../../services/layer-groups.service';
+import Feature from 'ol/Feature';
+import {Geometry} from 'ol/geom';
+import {initializeMapTooltip, MapTooltip} from './features';
+import {HotkeyService} from '../../services/hotkey.service';
+import {HotkeyDisplayComponent} from '../hotkey-display/hotkey-display.component';
 
 @Component({
   selector: 'app-map',
   imports: [
-    MapInfoComponent
+    MapInfoComponent,
+    DrawingToolbarComponent,
+    DrawingContextMenuComponent,
+    LayerGroupsToolbarComponent,
+    HotkeyDisplayComponent
   ],
   templateUrl: './map.component.html',
   styleUrl: './map.component.css'
 })
-export class MapComponent implements AfterViewInit {
+export class MapComponent implements AfterViewInit, OnDestroy {
   @ViewChild('map', { static: true }) mapElement!: ElementRef;
   map!: Map;
-  @ViewChild('tooltip', { static: true }) tooltip!: HTMLElement;
+  private mapTooltip!: MapTooltip;
+  private layerSwitcher!: LayerSwitcher;
+  private hexSectorsLayer: LayerGroup | null = null;
+  @ViewChild('contextMenu') contextMenu!: DrawingContextMenuComponent;
 
   private readonly settingsService: SettingsService = inject(SettingsService);
+  private readonly drawingService: DrawingService = inject(DrawingService);
+  private readonly layerGroupsService: LayerGroupsService = inject(LayerGroupsService);
+  private readonly structureIconsService: StructureIconsService = inject(StructureIconsService);
+  private readonly regionSectorsService: RegionSectorsService = inject(RegionSectorsService);
+  private readonly hotkeyService: HotkeyService = inject(HotkeyService);
   private readonly staticLayers: LayerService[] = [
     inject(HexOverlayService),
     inject(RegionLabelsService),
-    inject(StructureIconsService),
-    inject(RegionSectorsService)
+    inject(StructureIconsService)
   ];
 
   shard: WritableSignal<Shard> = this.settingsService.selectedShard;
+  showHotkeyDisplay = false;
 
   ngAfterViewInit() {
     proj4.defs(this.PROJECTION_CODE, '+proj=identity +no_defs');
     register(proj4);
 
-    this.tooltip = document.getElementById('tooltip')!;
     this.map = this.initialiseMap();
+    this.setupHotkeys();
+    this.hotkeyService.enableContext("map");
 
-    this.map.on('pointermove', (evt) => {
-      if (evt.dragging) {
-        this.tooltip.style.display = 'none';
-        return;
-      }
-
-      const pixel = this.map.getEventPixel(evt.originalEvent);
-      const features = this.map.getFeaturesAtPixel(pixel);
-
-      if (features.length > 0) {
-        const tooltipContent: string = features
-          .map(feature => feature.get('name'))
-          .find(name => !!name);
-
-        if (tooltipContent) {
-          this.tooltip.style.display = 'block';
-          this.tooltip.style.left = (pixel[0] + 10) + 'px';
-          this.tooltip.style.top = (pixel[1] + 10) + 'px';
-          this.tooltip.innerText = tooltipContent;
-        } else {
-          this.tooltip.style.display = 'none';
-        }
-      } else {
-        this.tooltip.style.display = 'none';
-      }
+    this.layerSwitcher = new LayerSwitcher({
+      startActive: false, // Start closed
+      tipLabel: 'Layer list', // Tooltip for button
+      collapseTipLabel: 'Close layer list' // Tooltip when open
     });
 
-    this.map.getViewport().addEventListener('mouseout', () => {
-      this.tooltip.style.display = 'none';
+    this.drawingService.initialize(this.map);
+
+    this.mapTooltip = initializeMapTooltip(this.map, {
+      tooltipElement: 'tooltip',
+      hitTolerance: 5
+    });
+
+    this.drawingService.featureRightClicked$.subscribe(featureClick => {
+      if (featureClick) {
+        this.contextMenu.show(featureClick.event, featureClick.feature);
+      }
     });
   }
+
+  ngOnDestroy() {
+    if (this.mapTooltip) {
+      this.mapTooltip.destroy();
+    }
+    this.hotkeyService.unregisterByContext('map');
+  }
+
+  private setupHotkeys(): void {
+    this.hotkeyService.register({
+      key: '?',
+      modifiers: {
+        shift: true
+      },
+      description: 'Show keyboard shortcuts',
+      action: () => this.toggleHotkeyDisplay(),
+      context: 'map'
+    });
+
+    this.hotkeyService.register({
+      key: "r",
+      description: "Reset map layers",
+      action: () => this.layerGroupsService.resetToDefaults(),
+      context: 'map'
+    })
+
+    this.hotkeyService.register({
+      key: '1',
+      description: "Toggle Overview Layer",
+      action: () => this.layerGroupsService.toggleLayerGroup('overview'),
+      context: 'map'
+    });
+
+    this.hotkeyService.register({
+      key: '2',
+      description: "Toggle Logistics Layer",
+      action: () => this.layerGroupsService.toggleLayerGroup('logistics'),
+      context: 'map'
+    })
+
+    this.hotkeyService.register({
+      key: '3',
+      description: "Toggle Resource Layer",
+      action: () => this.layerGroupsService.toggleLayerGroup('production'),
+      context: 'map'
+    })
+
+    this.hotkeyService.register({
+      key: '4',
+      description: "Toggle Defence Layer",
+      action: () => this.layerGroupsService.toggleLayerGroup('defence'),
+      context: 'map'
+    })
+
+    this.hotkeyService.register({
+      key: '5',
+      description: "Toggle Intelligence Layer",
+      action: () => this.layerGroupsService.toggleLayerGroup('intelligence'),
+      context: 'map'
+    });
+
+    this.hotkeyService.register({
+      key: '6',
+      description: "Toggle Heavy Weapons Layer",
+      action: () => this.layerGroupsService.toggleLayerGroup('weapons'),
+      context: 'map'
+    });
+
+    this.hotkeyService.register({
+      key: '7',
+      description: "Toggle Hex Sectors Layer",
+      action: () => this.layerGroupsService.toggleLayerGroup('hex-sectors'),
+      context: 'map'
+    })
+  }
+
+  private resetMapView(): void {
+    const view = this.map.getView();
+    view.setCenter([0, 0]);
+    view.setZoom(2);
+  }
+
+  private toggleHotkeyDisplay(): void {
+    this.showHotkeyDisplay = !this.showHotkeyDisplay;
+  }
+
+  onDeleteFeature(feature: Feature<Geometry>): void {
+    this.drawingService.deleteFeature(feature);
+  }
+
+  onDrawingTypeChange(drawingType: DrawingType): void {
+    this.drawingService.setDrawingType(drawingType);
+  }
+
+  onLayerSwitcherToggle(): void {
+    if (this.layerSwitcher && this.map) {
+      const controls = this.map.getControls();
+      const existingLayerSwitcher = controls.getArray().find(control => control instanceof LayerSwitcher);
+
+      if (existingLayerSwitcher) {
+        this.map.removeControl(existingLayerSwitcher);
+      } else {
+        this.map.addControl(this.layerSwitcher);
+        this.layerSwitcher.showPanel();
+      }
+    }
+  }
+
 
   readonly PROJECTION_CODE = "GAME_SIMPLE";
   readonly TILE_SIZE = 256;
@@ -111,11 +225,6 @@ export class MapComponent implements AfterViewInit {
     (_, i) => Math.pow(2, this.MAX_ZOOM - i)
   );
 
-  readonly mousePositionControl = new MousePosition({
-    coordinateFormat: createStringXY(0),
-    projection: this.gameProjection
-  });
-
   readonly mapLink = new Link({
     params: ["x", "y", "z", "l"]
   });
@@ -136,23 +245,15 @@ export class MapComponent implements AfterViewInit {
       layers: [
         baseLayer
       ],
-      controls: [this.mousePositionControl, new LayerSwitcher()],
+      controls: [],
       interactions: [
         new DragPan({
-          kinetic: new Kinetic(-0.005, 0.05, 100)
+          kinetic: new Kinetic(-0.005, 0.05, 100),
+          condition: (event) => {
+            return event.originalEvent.button === 0 || event.originalEvent.button === 1;
+          }
         }),
         new MouseWheelZoom(),
-        new Draw({
-          source: new VectorSource(),
-          type: "LineString",
-          style: new Style({
-            stroke: new Stroke({
-              color: 'white',
-              width: 2
-            })
-          }),
-          freehandCondition: shiftKeyOnly,
-        }),
         this.mapLink,
       ],
       view: new View({
@@ -170,9 +271,6 @@ export class MapComponent implements AfterViewInit {
     map.on('click', (evt) => {
       const pixel = map.getEventPixel(evt.originalEvent)
       const features = map.getFeaturesAtPixel(pixel);
-      if (features.length) {
-        console.log('Feature found at click:', features[0].getGeometry());
-      }
     });
 
     map.once("loadend", () => {
@@ -218,11 +316,52 @@ export class MapComponent implements AfterViewInit {
   }
 
   _ = effect(() => this.initialiseLayers(this.shard()));
+
+  hexSectorsEffect = effect(() => {
+    const isHexSectorsVisible = this.layerGroupsService.isLayerGroupVisible('hex-sectors');
+    this.handleHexSectorsVisibility(isHexSectorsVisible);
+  });
+
+  private async handleHexSectorsVisibility(visible: boolean): Promise<void> {
+    if (!this.map) return;
+
+    if (visible) {
+      if (!this.hexSectorsLayer) {
+        this.hexSectorsLayer = await this.regionSectorsService.getLayer(this.shard());
+        this.map.addLayer(this.hexSectorsLayer);
+      } else if (!this.map.getLayers().getArray().includes(this.hexSectorsLayer)) {
+        this.map.addLayer(this.hexSectorsLayer);
+      }
+    } else {
+      if (this.hexSectorsLayer && this.map.getLayers().getArray().includes(this.hexSectorsLayer)) {
+        this.map.removeLayer(this.hexSectorsLayer);
+      }
+    }
+  }
+
+  private async updateHexSectorsLayer(shard: Shard): Promise<void> {
+    if (!this.map) return;
+
+    const isVisible = this.layerGroupsService.isLayerGroupVisible('hex-sectors');
+
+    if (this.hexSectorsLayer && this.map.getLayers().getArray().includes(this.hexSectorsLayer)) {
+      this.map.removeLayer(this.hexSectorsLayer);
+    }
+
+    this.hexSectorsLayer = await this.regionSectorsService.getLayer(shard);
+
+    if (isVisible) {
+      this.map.addLayer(this.hexSectorsLayer);
+    }
+  }
+
   private initialiseLayers(shard: Shard) {
     if (!this.map) {
       console.warn('Map not initialised, skipping layer initialisation');
       return;
     }
+
+    this.updateHexSectorsLayer(shard);
 
     this.staticLayers.forEach(layerService => {
       layerService.getLayer(shard).then(group => {
