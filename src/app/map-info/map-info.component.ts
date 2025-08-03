@@ -31,6 +31,11 @@ export class MapInfoComponent {
       switchMap(shard => this.warApiService.getCurrentWarData(shard))
     )
   );
+  victoryPointCounts = toSignal(
+    toObservable(this.shard).pipe(
+      switchMap(shard => this.warApiService.getVictoryPointCounts(shard))
+    )
+  );
   isActiveWar = computed(() => this.warData() !== undefined);
 
   getTimeSince(timestamp: number): string {

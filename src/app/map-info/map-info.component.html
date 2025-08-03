@@ -1,15 +1,54 @@
-<div class="flex flex-col px-1 mx-2 bg-zinc-900 rounded-sm">
-  <div class="flex w-full h-fit mt-2 mx-0">
-    <p-select class="mx-1 w-full" size="small" [options]="selectableShards" [(ngModel)]="shard" (onChange)="saveSelectedShard($event)"/>
-  </div>
-  @if (isActiveWar()) {
-    <p class="text-sm mt-2 mb-2">
-      War #{{warData()?.warNumber}}
-      @if (warData()?.conquestStartTime !== undefined) {
-        started {{getTimeSince(warData()!.conquestStartTime)}} ago
+<div class="h-12 max-h-12 min-h-12 border border-slate-500/40 z-[1000] mx-1 w-fit transition-all duration-200 ease-in-out hover:border-blue-500/30 bg-slate-800 backdrop-blur-xl rounded-lg">
+  <div class="px-1.5 py-1.5 flex items-center justify-center">
+    <div class="flex items-center border-b border-slate-500/30">
+      <p-select
+        size="small"
+        [options]="selectableShards"
+        [(ngModel)]="shard"
+        (onChange)="saveSelectedShard($event)"
+        placeholder="Shard">
+      </p-select>
+    </div>
+
+    <div class="w-px h-6 bg-slate-600/50 mx-2"></div>
+
+    <div class="flex items-center border-b-0 pb-0">
+      @if (isActiveWar()) {
+        <div class="flex items-center gap-2 animate-fadeInUp">
+          <div class="bg-green-500/20 text-green-400 px-2 py-1 rounded-full text-xs font-medium transition-all duration-200 ease-in-out backdrop-blur-sm">
+            <i class="pi pi-circle-fill mr-1 text-xs"></i>War #{{warData()?.warNumber}}
+          </div>
+          @if (warData()?.conquestStartTime !== undefined) {
+            <span class="text-xs text-slate-400 transition-all duration-200 ease-in-out">{{getTimeSince(warData()!.conquestStartTime)}} ago</span>
+          }
+        </div>
+      } @else {
+        <div class="flex items-center gap-2 animate-fadeIn">
+          <div class="bg-slate-500/20 text-slate-400 px-2 py-1 rounded-full text-xs font-medium transition-all duration-200 ease-in-out backdrop-blur-sm">
+            <i class="pi pi-pause-circle mr-1 text-xs animate-pulse"></i>No War
+          </div>
+        </div>
       }
-    </p>
-  } @else {
-    <p>No active war</p>
-  }
+    </div>
+
+    @if (isActiveWar() && victoryPointCounts()) {
+      <div class="w-px h-6 bg-slate-600/50 mx-2"></div>
+
+      <div class="flex items-center gap-2 mx-1">
+<!--        <div class="text-xs text-slate-300">Victory Points:</div>-->
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1">
+            <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+            <span class="text-sm text-blue-400 font-medium">{{victoryPointCounts()!.wardens}}</span>
+          </div>
+          <span class="text-sm text-slate-400">/</span>
+          <div class="flex items-center gap-1">
+            <div class="w-2 h-2 rounded-full bg-green-500"></div>
+            <span class="text-sm text-green-400 font-medium">{{victoryPointCounts()!.colonials}}</span>
+          </div>
+          <span class="text-xs text-slate-400">{{victoryPointCounts()!.requiredForVictory}} for Victory</span>
+        </div>
+      </div>
+    }
+  </div>
 </div>
